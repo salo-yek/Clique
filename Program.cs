@@ -348,6 +348,8 @@ namespace Clique
         public string? Role { get; set; }
         [JsonPropertyName("content")]
         public string? Content { get; set; }
+        [JsonPropertyName("reasoning_content")]
+        public string? ReasoningContent { get; set; }
         [JsonPropertyName("tool_calls")]
         public List<ToolCall>? ToolCalls { get; set; }
     }
@@ -593,35 +595,38 @@ namespace Clique
 
     public static class Theme
     {
-        public const string Accent    = "steelblue";
-        public const string User      = "springgreen3";
-        public const string Tool      = "darkkhaki";
-        public const string Muted     = "grey46";
-        public const string Dim       = "grey35";
-        public const string Warn      = "gold3_1";
-        public const string Err       = "indianred";
-        public const string Ok        = "darkseagreen";
-        public const string Danger    = "orangered1";
-        public const string Network   = "skyblue3";
-        public const string System    = "mediumpurple";
-        public const string Provider  = "rosybrown";
+        public const string Primary   = "cyan";
+        public const string Secondary = "magenta";
+        public const string User      = "lime";
+        public const string Accent    = "yellow";
+        public const string Muted     = "grey";
+        public const string Dim       = "grey";
+        public const string Warn      = "orange3";
+        public const string Err       = "red";
+        public const string Ok        = "green";
+        public const string Danger    = "red3";
+        public const string Network   = "blue";
+        public const string System    = "purple";
+        public const string Border    = "turquoise2";
+        public const string Prompt    = "gold";
+        public const string Provider  = "fuchsia";
 
         public static string CategoryColor(string cat) => cat switch
         {
-            ToolCategory.Shell      => Danger,
+            ToolCategory.Shell      => Err,
             ToolCategory.FileWrite  => Warn,
-            ToolCategory.FileDelete => Err,
-            ToolCategory.FileRead   => Accent,
-            ToolCategory.Network    => Network,
+            ToolCategory.FileDelete => Danger,
+            ToolCategory.FileRead   => Network,
+            ToolCategory.Network    => Primary,
             ToolCategory.System     => System,
             _                       => Muted
         };
 
-        public static void Error(string msg)   => AnsiConsole.MarkupLine($"[{Err}]  {Esc(msg)}[/]");
-        public static void LogWarn(string msg) => AnsiConsole.MarkupLine($"[{Warn}]  {Esc(msg)}[/]");
-        public static void LogOk(string msg)   => AnsiConsole.MarkupLine($"[{Ok}]  {Esc(msg)}[/]");
-        public static void Info(string msg)    => AnsiConsole.MarkupLine($"[{Muted}]  {Esc(msg)}[/]");
-        public static void Hint(string msg)    => AnsiConsole.MarkupLine($"[{Dim}]  {Esc(msg)}[/]");
+        public static void Error(string msg)   => AnsiConsole.MarkupLine($"[{Err}]X {Esc(msg)}[/]");
+        public static void LogWarn(string msg) => AnsiConsole.MarkupLine($"[{Warn}]! {Esc(msg)}[/]");
+        public static void LogOk(string msg)   => AnsiConsole.MarkupLine($"[{Ok}]OK {Esc(msg)}[/]");
+        public static void Info(string msg)    => AnsiConsole.MarkupLine($"[{Network}]i {Esc(msg)}[/]");
+        public static void Hint(string msg)    => AnsiConsole.MarkupLine($"[{Dim}]. {Esc(msg)}[/]");
 
         public static string Esc(string? s)
         {
@@ -629,61 +634,83 @@ namespace Clique
             return s.Replace("[", "[[").Replace("]", "]]");
         }
     }
-
+ 
     public class UIService
     {
         public void ShowHeader()
         {
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"  [bold {Theme.Accent}]Clique[/]  [grey35]AI Gateway[/]");
+            var banner = new FigletText("Clique")
+            {
+                Color = Spectre.Console.Color.Cyan
+            };
+            AnsiConsole.Write(banner);
+            AnsiConsole.MarkupLine("  [cyan]AI Gateway[/]  -  [grey]Powered by Ollama and Mistral[/]");
             Divider();
         }
 
         public static void Divider(string style = "grey23")
         {
             var width = Math.Min(Console.WindowWidth, 80);
-            AnsiConsole.MarkupLine($"[{style}]{new string('─', width)}[/]");
+            AnsiConsole.MarkupLine($"[{style}]{new string('━', width)}[/]");
         }
 
         public void ShowStatusBar(string model, AppMode mode, bool connected, ApiProvider provider = ApiProvider.Ollama)
         {
-            var connDot  = connected ? $"[{Theme.Ok}]●[/]" : $"[{Theme.Err}]●[/]";
+            var connDot  = connected ? $"[{Theme.Ok}]●[/]" : $"[{Theme.Err}]○[/]";
+            var connText = connected ? $"[{Theme.Ok}]online[/]" : $"[{Theme.Err}]offline[/]";
             var modeTag  = mode switch
             {
                 AppMode.Agent => $"[{Theme.Warn}]agent[/]",
-                _             => $"[{Theme.Accent}]chat[/]"
+                _             => $"[{Theme.Primary}]chat[/]"
             };
             var provTag  = provider == ApiProvider.Mistral
-                ? $"[{Theme.Provider}]mistral[/]"
+                ? $"[{Theme.Secondary}]mistral[/]"
                 : $"[{Theme.Ok}]ollama[/]";
 
-            var shortModel = model.Length > 32 ? model[..32] + "…" : model;
+            var shortModel = model.Length > 28 ? model[..28] + "…" : model;
 
-            AnsiConsole.MarkupLine(
-                $"  {connDot}  [{Theme.Muted}]{Theme.Esc(shortModel)}[/]  [{Theme.Dim}]·[/]  {provTag}  [{Theme.Dim}]·[/]  {modeTag}");
+            AnsiConsole.MarkupLine($"  {connDot} {connText}  --  [{Theme.Muted}]{Theme.Esc(shortModel)}[/]  --  {provTag}  --  {modeTag}");
             Divider();
         }
 
-        public void ShowUserMessage(string content, string username)
+        public void ShowAiMessage(string content)
         {
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"  [{Theme.User}]{Theme.Esc(username)}[/]  [{Theme.Muted}]{DateTime.Now:HH:mm}[/]");
-            AnsiConsole.MarkupLine($"  {Theme.Esc(content)}");
+            var escaped = string.Join("\n", content.Split('\n').Select(l => Theme.Esc(l)));
+            var panel = new Panel(escaped)
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Cyan)
+                .Header("AI")
+                .Expand();
+            AnsiConsole.Write(panel);
         }
 
         public void BeginAiMessage()
         {
             AnsiConsole.WriteLine();
-            AnsiConsole.Markup($"  [{Theme.Accent}]ai[/]  [{Theme.Muted}]{DateTime.Now:HH:mm}[/]\n  ");
+            AnsiConsole.Markup("  [cyan]>> ai[/]  [grey]" + DateTime.Now.ToString("HH:mm") + "[/]\n  ");
         }
 
-        public void ShowAiMessage(string content)
+        public void ShowUserMessage(string content, string username)
+        {
+            var escaped = string.Join("\n", content.Split('\n').Select(l => Theme.Esc(l)));
+            var panel = new Panel(escaped)
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Lime)
+                .Header("You")
+                .Expand();
+            AnsiConsole.Write(panel);
+        }
+
+        public void ShowUserMessageWithThinking(string content, string username)
         {
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"  [{Theme.Accent}]ai[/]  [{Theme.Muted}]{DateTime.Now:HH:mm}[/]");
+            AnsiConsole.MarkupLine("  [lime]>> " + username + "[/]  [grey]" + DateTime.Now.ToString("HH:mm") + "[/]");
 
             foreach (var line in content.Split('\n'))
-                AnsiConsole.MarkupLine($"  {Theme.Esc(line)}");
+                AnsiConsole.MarkupLine("  [lime](*)[/]  " + Theme.Esc(line));
+            
+            AnsiConsole.MarkupLine("  [grey](*)[/]  [grey]thinking...[/]");
         }
 
         public void ShowToolStart(string toolName)
@@ -698,25 +725,24 @@ namespace Clique
                 "get_env"        => "system",
                 _                => "file_read"
             };
-            AnsiConsole.MarkupLine(
-                $"  [{Theme.Dim}]·[/] [{Theme.CategoryColor(cat)}]{Theme.Esc(toolName)}[/] [{Theme.Muted}]running[/]");
+            AnsiConsole.MarkupLine($"  .. [{Theme.CategoryColor(cat)}]{Theme.Esc(toolName)}[/{Theme.CategoryColor(cat)}]  [{Theme.Muted}]running...[/{Theme.Muted}]");
         }
 
         public void ShowToolResult(string toolName, bool success, string summary)
         {
-            var dot   = success ? $"[{Theme.Ok}]✓[/]" : $"[{Theme.Err}]✗[/]";
-            AnsiConsole.MarkupLine($"  {dot} [{Theme.Muted}]{Theme.Esc(summary)}[/]");
+            var icon = success ? $"[{Theme.Ok}]OK[/]" : $"[{Theme.Err}]FAIL[/]";
+            AnsiConsole.MarkupLine($"  .. {icon} [{Theme.Muted}]{Theme.Esc(summary)}[/]");
         }
 
         public void ShowThinking()
         {
-            AnsiConsole.Markup($"  [{Theme.Muted}]thinking…[/]");
+            AnsiConsole.MarkupLine("  [cyan](*)[/]  [grey]thinking...[/]");
         }
 
         public string PromptInput(string username)
         {
             AnsiConsole.WriteLine();
-            AnsiConsole.Markup($"  [{Theme.User}]>[/] ");
+            AnsiConsole.Markup("  [lime]>[/] ");
             return ReadMultiLineInput();
         }
 
@@ -762,25 +788,25 @@ namespace Clique
         public void ShowHelp()
         {
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"  [{Theme.Muted}]commands[/]");
+            AnsiConsole.MarkupLine("  [cyan]commands[/]");
             Divider("grey19");
 
             var cmds = new[]
             {
                 ("/clear",         "clear history"),
                 ("/model",         "switch model"),
-                ("/mode",          "cycle chat → agent"),
+                ("/mode",          "cycle chat -> agent"),
                 ("/paste",         "multi-line paste mode"),
-                ("/image [[path]]",  "load image for vision"),
-                ("/perms [[sub]]",   "tool permissions  (reset · clear-session)"),
-                ("/path [[sub]]",    "manage PATH  (enable · disable · status)"),
-                ("/api [[clear]]",   "configure Mistral API key"),
+                ("/image [path]",  "load image for vision"),
+                ("/perms [sub]",   "tool permissions  (reset, clear-session)"),
+                ("/path [sub]",    "manage PATH  (enable, disable, status)"),
+                ("/api [clear]",   "configure Mistral API key"),
                 ("/help",          "this screen"),
                 ("/quit",          "exit"),
             };
 
             foreach (var (cmd, desc) in cmds)
-                AnsiConsole.MarkupLine($"  [{Theme.Accent}]{cmd,-22}[/][{Theme.Muted}]{desc}[/]");
+                AnsiConsole.MarkupLine("  [" + Theme.Accent + "]" + Theme.Esc(cmd).PadRight(20) + "[/][" + Theme.Muted + "]" + Theme.Esc(desc) + "[/]");
 
             AnsiConsole.WriteLine();
         }
@@ -795,31 +821,31 @@ namespace Clique
 
             if (mistral.Any())
             {
-                choices.Add("── mistral ──");
+                choices.Add("--- mistral ---");
                 choices.AddRange(mistral.Select(m => $"mistral: {m.Name}"));
             }
             if (ollama.Any())
             {
-                choices.Add("── ollama ──");
+                choices.Add("--- ollama ---");
                 choices.AddRange(ollama.Select(m =>
                 {
                     var s = $"{m.Name}  ({m.Size})";
-                    if (m.Name == currentModel && currentProvider == ApiProvider.Ollama) s += "  ◀";
+                    if (m.Name == currentModel && currentProvider == ApiProvider.Ollama) s += "  *";
                     return s;
                 }));
             }
 
             var selected = await AnsiConsole.PromptAsync(
                 new SelectionPrompt<string>()
-                    .Title($"  [{Theme.Muted}]select model[/]")
+                    .Title($"  [{Theme.Primary}]select model[/]")
                     .PageSize(18)
                     .AddChoices(choices));
 
             if (selected.StartsWith("mistral: ")) return selected[9..];
-            if (selected.StartsWith("──")) return currentModel;
+            if (selected.StartsWith("---")) return currentModel;
 
             var idx = selected.IndexOf("  (", StringComparison.Ordinal);
-            return idx >= 0 ? selected[..idx] : selected.TrimEnd('▲', ' ', '◀');
+            return idx >= 0 ? selected[..idx] : selected.TrimEnd('*', ' ');
         }
 
         public string? PromptImagePath()
@@ -849,20 +875,19 @@ namespace Clique
         {
             AnsiConsole.WriteLine();
             Divider("grey19");
-            AnsiConsole.MarkupLine(
-                $"  [{Theme.CategoryColor(category)}]{toolName}[/]  [{Theme.Muted}]{category}[/]" +
+            AnsiConsole.MarkupLine($"  [{Theme.CategoryColor(category)}]{toolName}[/{Theme.CategoryColor(category)}]  [{Theme.Muted}]{category}[/]" +
                 (isDangerous ? $"  [{Theme.Danger}]dangerous[/]" : ""));
 
             if (targetPath != null)
-                AnsiConsole.MarkupLine($"  [{Theme.Muted}]path    [/]{Theme.Esc(targetPath)}");
+                AnsiConsole.MarkupLine($"  [{Theme.Muted}]{Theme.Esc(targetPath)}[/]");
             if (cmd != null)
             {
-                var display = cmd.Length > 72 ? cmd[..72] + "…" : cmd;
-                AnsiConsole.MarkupLine($"  [{Theme.Muted}]command [/]{Theme.Esc(display)}");
+                var display = cmd.Length > 72 ? cmd[..72] + "..." : cmd;
+                AnsiConsole.MarkupLine($"  [{Theme.Muted}]{Theme.Esc(display)}[/]");
             }
             if (isOutsideCwd)
             {
-                AnsiConsole.MarkupLine($"  [{Theme.Danger}]! outside cwd[/]  [{Theme.Muted}]{Theme.Esc(cwd)}[/]");
+                AnsiConsole.MarkupLine($"  [{Theme.Danger}]![/]  [{Theme.Muted}]cwd: {Theme.Esc(cwd)}[/]");
             }
 
             AnsiConsole.WriteLine();
@@ -1695,29 +1720,79 @@ namespace Clique
 
             _isGenerating = true;
             var fullResponse = new StringBuilder();
+            bool hasThinking = false;
+            bool startedStreaming = false;
+            bool thinkingStarted = false;
+            var thinkingCts = new CancellationTokenSource();
+            Task? thinkingTask = null;
 
             try
             {
-                _ui!.BeginAiMessage();
                 await foreach (var chunk in _mistralService.ChatStreamAsync(_selectedModel, _messages.TakeLast(20).ToList(), null, 0.7, cancellationToken))
                 {
-                    var content = chunk.Choices?.FirstOrDefault()?.Delta?.Content;
+                    var delta = chunk.Choices?.FirstOrDefault()?.Delta;
+                    var reasoning = delta?.ReasoningContent;
+                    if (!string.IsNullOrEmpty(reasoning))
+                    {
+                        hasThinking = true;
+                        fullResponse.Append(reasoning);
+                        if (!thinkingStarted)
+                        {
+                            thinkingStarted = true;
+                            startedStreaming = true;
+                            thinkingTask = Task.Run(async () =>
+                            {
+                                var frames = new[] { "●○○", "○●○", "○○●" };
+                                var i = 0;
+                                while (!thinkingCts.Token.IsCancellationRequested)
+                                {
+                                    AnsiConsole.Markup($"\r  [cyan]{frames[i]}[/]  [grey]thinking...[/]");
+                                    i = (i + 1) % 3;
+                                    await Task.Delay(150, thinkingCts.Token);
+                                }
+                            }, thinkingCts.Token);
+                        }
+                    }
+
+                    var content = delta?.Content;
                     if (content != null)
                     {
                         fullResponse.Append(content);
-                        Console.Write(Theme.Esc(StripMarkdown(content)));
-                        Console.Out.Flush();
+                        if (!startedStreaming)
+                        {
+                            startedStreaming = true;
+                        }
                     }
                 }
-                Console.WriteLine();
+                
+                if (hasThinking)
+                {
+                    thinkingCts.Cancel();
+                    try { await thinkingTask; } catch (OperationCanceledException) { }
+                    Console.WriteLine();
+                }
+                
                 var final = fullResponse.ToString().Trim();
                 if (!string.IsNullOrWhiteSpace(final))
+                {
                     _messages.Add(new Message { Role = MessageRole.Assistant, Content = StripMarkdown(final), Model = _selectedModel });
-                Console.WriteLine();
+                    _ui!.ShowAiMessage(final);
+                }
             }
-            catch (OperationCanceledException) { AnsiConsole.MarkupLine($"\n  [{Theme.Warn}]cancelled[/]"); }
-            catch (Exception ex)               { AnsiConsole.MarkupLine($"\n  [{Theme.Err}]{Theme.Esc(ex.Message)}[/]"); }
-            finally { _isGenerating = false; }
+            catch (OperationCanceledException) 
+            { 
+                thinkingCts.Cancel();
+                AnsiConsole.MarkupLine($"\n  [{Theme.Warn}]cancelled[/]"); 
+            }
+            catch (Exception ex)               
+            { 
+                thinkingCts.Cancel();
+                AnsiConsole.MarkupLine($"\n  [{Theme.Err}]{Theme.Esc(ex.Message)}[/]"); 
+            }
+            finally 
+            { 
+                _isGenerating = false; 
+            }
         }
 
         private static async Task RunMistralAgentAsync(CancellationToken cancellationToken)
@@ -1729,7 +1804,9 @@ namespace Clique
             var conversation = new List<Message> { new() { Role = MessageRole.System, Content = GenerateSystemPrompt() } };
             conversation.AddRange(_messages.TakeLast(10));
 
-            _ui!.ShowThinking();
+            var thinkingCts = new CancellationTokenSource();
+            Task? thinkingTask = null;
+            bool hasThinking = false;
 
             try
             {
@@ -1739,12 +1816,35 @@ namespace Clique
 
                     var responseContent   = new StringBuilder();
                     List<ToolCall>? toolCalls = null;
-                    bool gotToolCalls    = false;
-                    bool startedStreaming = false;
+                    bool gotToolCalls       = false;
+                    bool startedStreaming   = false;
 
                     await foreach (var chunk in _mistralService.ChatStreamAsync(_selectedModel, conversation, tools, 0.7, cancellationToken))
                     {
-                        var content = chunk.Choices?.FirstOrDefault()?.Delta?.Content;
+                        var delta = chunk.Choices?.FirstOrDefault()?.Delta;
+                        var reasoning = delta?.ReasoningContent;
+                        if (!string.IsNullOrEmpty(reasoning))
+                        {
+                            hasThinking = true;
+                            responseContent.Append(reasoning);
+                            if (!startedStreaming)
+                            {
+                                startedStreaming = true;
+                                thinkingTask = Task.Run(async () =>
+                                {
+                                    var frames = new[] { "●○○", "○●○", "○○●" };
+                                    var i = 0;
+                                    while (!thinkingCts.Token.IsCancellationRequested)
+                                    {
+                                        AnsiConsole.Markup($"\r  [cyan]{frames[i]}[/]  [grey]thinking...[/]");
+                                        i = (i + 1) % 3;
+                                        await Task.Delay(150, thinkingCts.Token);
+                                    }
+                                }, thinkingCts.Token);
+                            }
+                        }
+
+                        var content = delta?.Content;
                         if (content != null)
                         {
                             responseContent.Append(content);
@@ -1752,11 +1852,7 @@ namespace Clique
                             if (!startedStreaming)
                             {
                                 startedStreaming = true;
-                                Console.WriteLine();
-                                _ui!.BeginAiMessage();
                             }
-                            Console.Write(Theme.Esc(StripMarkdown(content)));
-                            Console.Out.Flush();
                         }
 
                         if (chunk.Choices?.FirstOrDefault()?.Delta?.ToolCalls != null)
@@ -1764,7 +1860,6 @@ namespace Clique
                             var tc = chunk.Choices.FirstOrDefault()?.Delta?.ToolCalls;
                             if (tc != null && tc.Any())
                             {
-                                // Preserve original tool call IDs from the AI response
                                 if (toolCalls == null)
                                     toolCalls = new List<ToolCall>();
                                 
@@ -1773,7 +1868,6 @@ namespace Clique
                                     var existingCall = toolCalls.FirstOrDefault(existing => existing.Id == t.Id);
                                     if (existingCall != null)
                                     {
-                                        // Update existing tool call with new data
                                         if (!string.IsNullOrEmpty(t.Function?.Name))
                                             existingCall.Function.Name = t.Function.Name;
                                         if (!string.IsNullOrEmpty(t.Function?.ArgumentsString))
@@ -1781,7 +1875,6 @@ namespace Clique
                                     }
                                     else
                                     {
-                                        // Add new tool call, preserving the original ID
                                         toolCalls.Add(new ToolCall
                                         {
                                             Id = t.Id ?? Guid.NewGuid().ToString()[..8],
@@ -1796,12 +1889,20 @@ namespace Clique
                                     }
                                 }
                                 gotToolCalls = true;
-                                // Continue streaming to get complete tool call data
                             }
                         }
                     }
 
-                    if (startedStreaming) Console.WriteLine();
+                    if (hasThinking)
+                    {
+                        thinkingCts.Cancel();
+                        try { if (thinkingTask != null) await thinkingTask; } catch (OperationCanceledException) { }
+                        Console.WriteLine();
+                    }
+                    else if (startedStreaming)
+                    {
+                        Console.WriteLine();
+                    }
 
                     var rawResponse = responseContent.ToString();
                     if (!gotToolCalls && !string.IsNullOrWhiteSpace(rawResponse))
@@ -1809,7 +1910,6 @@ namespace Clique
 
                     var hasToolCalls = gotToolCalls || (toolCalls != null && toolCalls.Any());
                     
-                    // Always add to conversation - either with content OR tool_calls, never both empty
                     if (hasToolCalls)
                     {
                         conversation.Add(new Message { Role = MessageRole.Assistant, Content = null, ToolCalls = toolCalls, Model = _selectedModel });
@@ -1820,23 +1920,14 @@ namespace Clique
                     }
                     else
                     {
-                        // Empty response with no tool calls - skip adding
                         break;
                     }
 
                     if (!hasToolCalls)
                     {
                         var displayResponse = StripMarkdown(FilterJsonBlocks(rawResponse)).Trim();
-                        if (!startedStreaming && !string.IsNullOrWhiteSpace(displayResponse))
-                        {
-                            Console.WriteLine();
-                            _ui!.ShowAiMessage(displayResponse);
-                            _messages.Add(new Message { Role = MessageRole.Assistant, Content = displayResponse, Model = _selectedModel });
-                        }
-                        else if (startedStreaming)
-                        {
-                            _messages.Add(new Message { Role = MessageRole.Assistant, Content = StripMarkdown(rawResponse.Trim()), Model = _selectedModel });
-                        }
+                        _messages.Add(new Message { Role = MessageRole.Assistant, Content = displayResponse, Model = _selectedModel });
+                        _ui!.ShowAiMessage(displayResponse);
                         break;
                     }
 
@@ -1856,8 +1947,16 @@ namespace Clique
                     }
                 }
             }
-            catch (OperationCanceledException) { AnsiConsole.MarkupLine($"\n  [{Theme.Warn}]cancelled[/]"); }
-            catch (Exception ex)               { AnsiConsole.MarkupLine($"\n  [{Theme.Err}]{Theme.Esc(ex.Message)}[/]"); }
+            catch (OperationCanceledException) 
+            { 
+                thinkingCts.Cancel();
+                AnsiConsole.MarkupLine($"\n  [{Theme.Warn}]cancelled[/]"); 
+            }
+            catch (Exception ex)               
+            { 
+                thinkingCts.Cancel();
+                AnsiConsole.MarkupLine($"\n  [{Theme.Err}]{Theme.Esc(ex.Message)}[/]"); 
+            }
             finally { _isGenerating = false; }
         }
 
@@ -1868,22 +1967,20 @@ namespace Clique
 
             try
             {
-                _ui!.BeginAiMessage();
                 await foreach (var chunk in _apiService!.ChatStreamAsync(_selectedModel, _messages.TakeLast(20).ToList(), null, 0.7, cancellationToken))
                 {
                     var content = chunk.Message?.Content;
                     if (content != null)
                     {
                         fullResponse.Append(content);
-                        Console.Write(Theme.Esc(StripMarkdown(content)));
-                        Console.Out.Flush();
                     }
                 }
-                Console.WriteLine();
                 var final = fullResponse.ToString().Trim();
                 if (!string.IsNullOrWhiteSpace(final))
+                {
                     _messages.Add(new Message { Role = MessageRole.Assistant, Content = StripMarkdown(final), Model = _selectedModel });
-                Console.WriteLine();
+                    _ui!.ShowAiMessage(final);
+                }
             }
             catch (OperationCanceledException) { AnsiConsole.MarkupLine($"\n  [{Theme.Warn}]cancelled[/]"); }
             catch (Exception ex)               { AnsiConsole.MarkupLine($"\n  [{Theme.Err}]{Theme.Esc(ex.Message)}[/]"); }
@@ -1930,11 +2027,7 @@ namespace Clique
                                     if (!startedStreaming)
                                     {
                                         startedStreaming = true;
-                                        Console.WriteLine();
-                                        _ui!.BeginAiMessage();
                                     }
-                                    Console.Write(Theme.Esc(StripMarkdown(content)));
-                                    Console.Out.Flush();
                                 }
                             }
 
